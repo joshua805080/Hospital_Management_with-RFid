@@ -1,0 +1,190 @@
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_socketio import SocketIO, emit
+from werkzeug.security import generate_password_hash, check_password_hash
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your_secret_key_here'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///staff.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+socketio = SocketIO(app)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    phone = db.Column(db.String(20), nullable=False)
+    role = db.Column(db.String(20), nullable=False)
+    rfid = db.Column(db.BigInteger, unique=True)
+    password_hash = db.Column(db.String(128))
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class Patient(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    rfid = db.Column(db.BigInteger, unique=True)
+    doctor_authorization = db.Column(db.Boolean, default=False)
+with app.app_context():
+    db.create_all()
+
+### Routes:
+@app.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        rfid = request.form.get('rfid')
+        if rfid and int(rfid) == 3821713683:
+            session['admin'] = True
+            flash('Admin login successful')
+            return redirect(url_for('admin_dashboard'))
+        flash('Invalid admin RFID')
+    return render_template('admin_login.html')
+
+@app.route('/logout', methods=['GET', 'POST'])
+def logout():
+    session.pop('admin', None)
+    session.pop('user_id', None)
+    flash('You have been logged out')
+    return redirect(url_for('admin_login'))
+
+@app.route('/admin_dashboard')
+def admin_dashboard():
+    if not session.get('admin'):
+        flash('Access denied')
+        return redirect(url_for('admin_login'))
+    staff = User.query.all()
+    return render_template('admin_dashboard.html', staff=staff)
+
+@app.route('/add_staff', methods=['POST'])
+def add_staff():
+    full_name = request.form['full_name']
+    email = request.form['email']
+    phone = request.form['phone']
+    role = request.form['role']
+    rfid = request.form['rfid']  # Use RFID as the identifier
+
+    # Assuming 'User' model has fields for full_name, email, phone, role, and rfid
+    new_staff = User(
+        full_name=full_name,
+        email=email,
+        phone=phone,
+        role=role,
+        rfid=rfid
+    )
+
+    # Add the new staff to the database
+    db.session.add(new_staff)
+    db.session.commit()
+
+    # Flash a message or redirect as needed
+    flash('Staff added successfully', 'success')
+
+    return redirect(url_for('admin_dashboard'))  # Redirect to the admin dashboard or another page
+
+@app.route('/remove_staff/<int:user_id>', methods=['POST'])
+def remove_staff(user_id):
+    if not session.get('admin'):
+        flash('Access denied')
+        return redirect(url_for('admin_login'))
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'Staff {user.full_name} removed successfully')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/staff_login', methods=['GET', 'POST'])
+def staff_login():
+    if request.method == 'POST':
+        rfid = request.form['rfid']
+        
+        # Find the user by RFID (assuming it's unique)
+        staff_member = User.query.filter_by(rfid=rfid).first()
+
+        if staff_member and staff_member.role != 'admin':
+            # Valid login, set session or other authentication details
+            session['user_id'] = staff_member.id
+            session['role'] = staff_member.role
+
+            # Redirect based on the role
+            if staff_member.role == 'doctor':
+                return redirect(url_for('doctor_dashboard'))  # Redirect to doctor dashboard
+            elif staff_member.role == 'nurse':
+                return redirect(url_for('nurse_dashboard'))  # Redirect to nurse dashboard
+            elif staff_member.role == 'pharmacist':
+                return redirect(url_for('pharmacist_dashboard'))  # Redirect to pharmacist dashboard
+            elif staff_member.role == 'receptionist':
+                return redirect(url_for('receptionist_dashboard'))  # Redirect to receptionist dashboard
+            else:
+                flash('Access Denied: Unauthorized role', 'error')
+                return redirect(url_for('staff_login'))  # Redirect back to login if role is not recognized
+        else:
+            flash('Invalid RFID or access restricted for Admin', 'error')
+            return redirect(url_for('staff_login'))  # Redirect back to login if RFID is invalid
+    return render_template('login.html')  # Render login page for GET requests
+
+@app.route('/doctor_dashboard')
+def doctor_dashboard():
+    if 'role' not in session or session['role'] != 'doctor':
+        flash('Unauthorized access', 'error')
+        return redirect(url_for('staff_login'))
+    return render_template('doctor_dashboard.html')
+
+@app.route('/nurse_dashboard')
+def nurse_dashboard():
+    # Logic for nurse dashboard
+    return render_template('nurse_dashboard.html')
+
+@app.route('/pharmacist_dashboard')
+def pharmacist_dashboard():
+    # Logic for pharmacist dashboard
+    return render_template('pharmacist_dashboard.html')
+
+@app.route('/receptionist_dashboard')
+def receptionist_dashboard():
+    # Logic for receptionist dashboard
+    return render_template('receptionist_dashboard.html')
+
+
+@app.route('/patients', methods=['GET'])
+def patients():
+    if session.get('admin') and not any(patient.doctor_authorization for patient in Patient.query.all()):
+        flash('You do not have permission to view patient data')
+        return redirect(url_for('admin_dashboard'))
+    patients = Patient.query.all()
+    return render_template('patients.html', patients=patients)
+
+@app.route('/authorize_patient/<int:patient_id>', methods=['POST'])
+def authorize_patient(patient_id):
+    if not session.get('admin'):
+        flash('You do not have permission to authorize patients')
+        return redirect(url_for('admin_dashboard'))
+    patient = Patient.query.get_or_404(patient_id)
+    patient.doctor_authorization = True
+    db.session.commit()
+    flash(f'Patient {patient.name} authorized for admin access')
+    return redirect(url_for('patients'))
+
+@app.route('/rfid_scan', methods=['POST'])
+def rfid_scan_http():
+    rfid = request.form.get('rfid')
+    if rfid:
+        socketio.emit('rfid_response', {'rfid': rfid}, namespace='/')
+        return jsonify({"status": "success", "rfid": rfid})
+    return jsonify({"status": "error", "message": "Invalid RFID"}), 400
+
+@socketio.on('rfid_scan')
+def handle_rfid_scan(data):
+    rfid = data.get('rfid')
+    if rfid:
+        emit('rfid_response', {'rfid': rfid}, broadcast=False)
+    else:
+        emit('rfid_response', {'error': 'Invalid RFID'}, broadcast=False)
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

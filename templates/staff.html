@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Staff Management</title>
+</head>
+<body>
+    <h2>Staff</h2>
+    <a href="{{ url_for('logout') }}">Logout</a>
+    {% if current_user.role == 'admin' %}
+    <form method="POST" action="{{ url_for('staff') }}">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <select name="role">
+            <option value="nurse">Nurse</option>
+            <option value="doctor">Doctor</option>
+            <option value="pharmacist">Pharmacist</option>
+            <option value="admin">Admin</option>
+            <option value="receptionist">Receptionist</option>
+        </select>
+        <input type="number" name="rfid" placeholder="RFID Number">
+        <input type="submit" value="Add Staff">
+    </form>
+    {% endif %}
+    <ul>
+    {% for user in staff %}
+        <li>{{ user.username }} - {{ user.role }} - RFID: {{ user.rfid }}</li>
+    {% endfor %}
+    </ul>
+</body>
+</html>
