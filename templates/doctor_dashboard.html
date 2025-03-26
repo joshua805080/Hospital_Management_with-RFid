@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Doctor Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        socket.on('rfid_response', function(data) {
+            if (data.rfid) {
+                document.getElementById('patientRFIDInput').value = data.rfid;
+                document.getElementById('scanButton').textContent = "Scanned";
+                fetchPatientDetails(data.rfid);
+            } else if (data.error) {
+                document.getElementById('status').innerText = "Error: " + data.error;
+            }
+        });
+
+        function fetchPatientDetails(rfid) {
+            fetch(`/get_patient_details/${rfid}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('status').innerText = "Error: " + data.error;
+                } else {
+                    document.getElementById('patientDetails').innerHTML = `
+                        <h3>Patient Details</h3>
+                        <p><strong>Name:</strong> ${data.name}</p>
+                        <p><strong>Age:</strong> ${data.age}</p>
+                        <p><strong>Medical History:</strong> ${data.medical_history}</p>
+                        <p><strong>Current Condition:</strong> ${data.current_condition}</p>
+                    `;
+                    document.getElementById('medicalUpdateForm').style.display = 'block';
+                }
+            })
+            .catch(error => console.error('Error fetching patient details:', error));
+        }
+    </script>
+</head>
+<body>
+    <h2>Doctor Dashboard</h2>
+    <input type="number" id="patientRFIDInput" name="rfid" placeholder="Scan Patient RFID" required>
+    <button id="scanButton" type="button">Scan Patient Card</button>
+    <div id="status"></div>
+    <div id="patientDetails"></div>
+    
+    <form id="medicalUpdateForm" method="POST" action="/update_patient_details" style="display:none;">
+        <input type="hidden" name="rfid" id="updateRFID">
+        <label for="medicalHistory">Medical History:</label>
+        <textarea id="medicalHistory" name="medical_history" required></textarea>
+        <label for="currentCondition">Current Condition:</label>
+        <textarea id="currentCondition" name="current_condition" required></textarea>
+        <input type="submit" value="Update Details">
+    </form>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Patient Detail</title>
+</head>
+<body>
+    <h2>{{ patient.name }}</h2>
+    <a href="{{ url_for('logout') }}">Logout</a>
+    <p>Prescription: {{ patient.prescription }}</p>
+    <p>RFID: {{ patient.rfid }}</p>
+    {% if can_edit %}
+    <form method="POST" action="{{ url_for('patient_detail', id=patient.id) }}">
+        <input type="text" name="prescription" value="{{ patient.prescription }}" required>
+        <input type="number" name="rfid" value="{{ patient.rfid }}" placeholder="RFID Number">
+        <input type="submit" value="Update Prescription and RFID">
+    </form>
+    {% endif %}
+</body>
+</html>

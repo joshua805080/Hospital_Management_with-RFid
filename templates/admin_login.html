@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- ... -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        function setupRFIDScanHandler(inputId) {
+            return function() {
+                // Placeholder for manual scan if needed
+            };
+        }
+
+        socket.on('rfid_response', function(data) {
+            if (data.rfid) {
+                document.getElementById('adminRFIDInput').value = data.rfid;
+                document.getElementById('scanButton').textContent = "Scanned";
+                var form = document.getElementById('adminLoginForm');
+                if (form) {
+                    form.submit();
+                } else {
+                    console.error('Form not found');
+                }
+            } else if (data.error) {
+                document.getElementById('status').innerText = "Error: " + data.error;
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('adminRFIDInput')) {
+                document.getElementById('scanButton').addEventListener('click', setupRFIDScanHandler('adminRFIDInput'));
+            }
+        });
+    </script>
+</head>
+<body>
+    <h2>Admin Login</h2>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul class="flashes">
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+    <form id="adminLoginForm" method="POST" action="{{ url_for('admin_login') }}">
+        <input type="number" id="adminRFIDInput" name="rfid" placeholder="Admin RFID" required>
+        <button id="scanButton" type="button">Scan ID Card</button>
+    </form>
+    <div id="status"></div>
+</body>
+</html>

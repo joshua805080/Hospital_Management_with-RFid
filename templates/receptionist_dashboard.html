@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Receptionist Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+    
+        socket.on('rfid_response', function(data) {
+            if (data.rfid) {
+                document.getElementById('rfid').value = data.rfid;
+                document.getElementById('scanButton').textContent = "Scanned";
+                // Do NOT submit the form here
+            } else if (data.error) {
+                document.getElementById('status').innerText = "Error: " + data.error;
+            }
+        });
+    
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('scanButton').addEventListener('click', function() {
+                socket.emit('rfid_scan');
+            });
+        });
+    </script>
+</head>
+<body>
+    <h2>Receptionist Dashboard - Register Patient</h2>
+    
+    <div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <p class="alert alert-{{ category }}">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <form method="POST" action="{{ url_for('register_patient') }}">
+        <label for="fullName">Full Name:</label>
+        <input type="text" id="fullName" name="full_name" required>
+
+        <label for="dob">Date of Birth:</label>
+        <input type="date" id="dob" name="dob" required>
+
+        <label for="gender">Gender:</label>
+        <select id="gender" name="gender" required>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+        </select>
+
+        <label for="phone">Phone Number:</label>
+        <input type="tel" id="phone" name="phone" required>
+
+        <label for="address">Address:</label>
+        <textarea id="address" name="address" required></textarea>
+
+        <label for="rfid">RFID Tag ID (Patient ID):</label>
+        <input type="text" id="rfid" name="rfid" required readonly>
+        <button type="button" id="scanButton">Scan RFID</button>
+
+        <input type="submit" value="Register Patient">
+    </form>
+
+    <div id="status"></div>
+</body>
+</html>

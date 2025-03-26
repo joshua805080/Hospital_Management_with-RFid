@@ -1,0 +1,22 @@
+<!-- nurse_dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nurse Dashboard</title>
+</head>
+<body>
+<h1>Welcome, Nurse</h1>
+<p>Manage patient vitals and records.</p>
+<div>
+    <form method="POST" action="/nurse/update_vitals">
+        <label for="patientRFID">Patient RFID:</label>
+        <input type="text" id="patientRFID" name="rfid" placeholder="Enter RFID" required>
+        <label for="vitals">Vitals:</label>
+        <textarea id="vitals" name="vitals" required></textarea>
+        <button type="submit">Update Vitals</button>
+    </form>
+</div>
+</body>
+</html>
